@@ -1,92 +1,85 @@
-import cv2
-import os
+import numpy as np
 
 
-def del_white(img):
+def get_digit_position(img):
+    """返回将输入的大图片中数字标识出现的位置"""
     width = img.shape[1]
     pos = width // 2
-    while img[0][pos] == 255:
-        img = img[1:, :]
-    while img[-1][pos] == 255:
-        img = img[:-1, :]
-    return img
+
+    # 根据像素在垂直方向上的投影判断数字标识的出现
+    pix_sum = np.sum(img[:, pos:], axis=1)
+    pix_sum_bool = np.logical_and(15000 > pix_sum, pix_sum > 2000)
+    char_location = []
+    pre_bool = False
+    bool_count = 0
+    for i, bool in enumerate(pix_sum_bool):
+        if not pre_bool and bool:
+            # False -> True
+            bool_count = 1
+        elif pre_bool and bool:
+            # True -> True
+            bool_count += 1
+        elif pre_bool and not bool:
+            # True -> False
+            if bool_count >= 10:
+                # 排除很短的断线的影响
+                location = i - bool_count
+                xs = np.where(img[location, :] > 0)[0]
+                dig_len = xs[-1] - xs[0]
+                if 80 < dig_len < 120:
+                    # 找到了标识的数字,记录其在垂直方向上的位置
+                    char_location.append(location - 1)
+                    # digit = img[location - 10:location + 20, -125:]
+                    # print(get_digit(digit))
+            bool_count = 0
+        pre_bool = bool
+
+    print('total_img:{}'.format(len(char_location)))
+    return char_location
 
 
-# def split_reverse(img, start, end, target_dir, line_beg=270, line_height=150):
-#     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-#     img = del_white(img)
-#
-#     height = img.shape[0]
-#     width = img.shape[1]
-#     print(img.shape[0])
-#     # print(img.shape[1])
-#     count = start - end + 1
-#     height_per_img = round(height / count)
-#     print(height_per_img)
-#     for i in range(count):
-#         base_name = i + 1
-#         beg = (count - i - 1) * height_per_img
-#         splited_img = img[beg:beg + height_per_img, :]
-#         splited_img1 = splited_img[line_beg:line_beg + line_height, :]
-#         splited_img2 = splited_img[line_beg + line_height:line_beg + 2 * line_height, :]
-#         splited_img3 = splited_img[line_beg + 2 * line_height:, :]
-#         cv2.imwrite(os.path.join(target_dir, '{}.jpg'.format(base_name)), splited_img)
-#         # cv2.imwrite(os.path.join(target_dir, '{}-{}.jpg'.format(base_name, 1)), splited_img1)
-#         # cv2.imwrite(os.path.join(target_dir, '{}-{}.jpg'.format(base_name, 2)), splited_img2)
-#         # cv2.imwrite(os.path.join(target_dir, '{}-{}.jpg'.format(base_name, 3)), splited_img3)
+def find_line_pos(image, char_location):
+    """根据image和对应的char_location，找到用于分割线的line_pos"""
+    line_pos = []
+    pos_flag = False
+    i = 0
+    while not pos_flag:
+        img = image[char_location[i]:char_location[i + 1], :]
+        pos_flag, line_pos = get_line_position(img)
+        i += 1
+    return line_pos
 
 
-def split(img, start, end, target_dir, line_beg=270, line_height=150):
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = del_white(img)
-    img = img[540:, :]
+def get_line_position(image):
+    """输入一张已经按数字标号分割出来的灰度化图片，获取该图片中三条线的位置
+        返回True代表该图中找到的线的位置具有普适性，可以用于分割其他图片中的线"""
+    left_ver_line = image[:, 0]
+    left_line_pos = []
+    pre_v = 0
+    for i, v in enumerate(left_ver_line):
+        # 线的上边界
+        if pre_v < 10 and v >= 10:
+            left_line_pos.append(i)
+        pre_v = v
 
-    height = img.shape[0]
-    width = img.shape[1]
-    print(img.shape[0])
-    # print(img.shape[1])
-    count = start - end + 1
-    height_per_img = round(height / count)
-    print(height_per_img)
-    for i in range(count):
-        base_name = start - i
-        beg = i * height_per_img
-        splited_img = img[beg:beg + height_per_img, :]
-        splited_img1 = splited_img[line_beg:line_beg + line_height, :]
-        splited_img2 = splited_img[line_beg + line_height:line_beg + 2 * line_height, :]
-        splited_img3 = splited_img[line_beg + 2 * line_height:, :]
-        # cv2.imwrite(os.path.join(target_dir, '{}.jpg'.format(base_name)), splited_img)
-        cv2.imwrite(os.path.join(target_dir, '{}-{}.jpg'.format(base_name, 1)), splited_img1)
-        cv2.imwrite(os.path.join(target_dir, '{}-{}.jpg'.format(base_name, 2)), splited_img2)
-        cv2.imwrite(os.path.join(target_dir, '{}-{}.jpg'.format(base_name, 3)), splited_img3)
+    right_ver_line = image[:, -1]
+    right_line_pos = []
+    pre_v = 0
+    for i, v in enumerate(right_ver_line):
+        # 线的上边界
+        if pre_v < 10 and v >= 10:
+            right_line_pos.append(i)
+        pre_v = v
 
-
-if __name__ == '__main__':
-    dir = 'digital_img'
-    target_dir = os.path.join(dir, 'split')
-    if not os.path.exists(target_dir):
-        os.mkdir(target_dir)
-
-    img_name = '20180530-002.bmp'
-    # img_name = '36.jpg'
-    file = os.path.join(dir, img_name)
-    img = cv2.imread(file)
-
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # img = del_white(img)
-    #
-    # cv2.imwrite(os.path.join(target_dir, img_name), img)
-
-    # print(img.shape[0])
-    # print(img.shape[1])
-    # 720 270 150
-    # 660 20 180
-    # img1 = img[270:420, :]
-    # img2 = img[420:570, :]
-    # img3 = img[570:, :]
-    # cv2.imshow('img1', img1)
-    # cv2.imshow('img2', img2)
-    # cv2.imshow('img3', img3)
-    # cv2.waitKey()
-    #
-    split(img, 370, 1, target_dir, line_beg=20, line_height=180)
+    # 判断该图中线的位置是否普适，即线的左右位置是否对其，是否一共有三根线
+    line_pos = []
+    if len(left_line_pos) == 3 and len(right_line_pos) == 3:
+        for i in range(len(left_line_pos)):
+            if abs(left_line_pos[i] - right_line_pos[i]) >= 5:
+                return False, line_pos
+        margin = (left_line_pos[2] - left_line_pos[0]) // 2
+        for pos in left_line_pos:
+            line_pos.append(pos - margin // 2)
+        return True, line_pos
+    else:
+        return False, line_pos
