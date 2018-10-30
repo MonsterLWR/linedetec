@@ -16,10 +16,10 @@ class LineDetector:
     def __pre_process(self, img, threshold):
         """对img做预处理，二值化"""
         # 灰度化
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # 二值化
-        _, img = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY_INV)
-        return img
+        _, pre_img = cv2.threshold(gray_img, threshold, 255, cv2.THRESH_BINARY_INV)
+        return gray_img, pre_img
 
     def __del_margin(self, img, margin, direction):
         """从img中去掉像素宽度为margin,方向为direction的边缘部分"""
@@ -79,7 +79,7 @@ class LineDetector:
             lower_right = img[-1][-1]
         return img, offset
 
-    def __get_info(self, img, step):
+    def __get_info(self, img, brightness, step):
         """计算img中的，以step为间距的采样的列上线的宽度，线的边界数和线距离顶部的长度"""
         # widths:保存每个采样的列上，线的宽度
         # edge_counts:保存每个采样的列上，线的边界个数
@@ -87,7 +87,8 @@ class LineDetector:
         # vatys:保存每个采样的列上，线宽度的连续变化
         info = {'widths': [], 'edge_counts': [], 'first_edge_dis': [], 'varys': [],
                 'img_height': img.shape[0],
-                'img_width': img.shape[1]}
+                'img_width': img.shape[1],
+                'brightness': brightness}
         pos = 0
         while pos < info['img_width']:
             col = img[:, pos]
@@ -117,6 +118,7 @@ class LineDetector:
             print('slopes:{}'.format(info['slopes']))
             print('widths:{}'.format(info['widths']))
             print('varys:{}'.format(info['varys']))
+            print('brightness:max:{},min:{}'.format(np.max(info['brightness']), np.min(info['brightness'])))
         return info
 
     def __get_slopes(self, first_edge_dis, sec_size):
@@ -134,12 +136,17 @@ class LineDetector:
         # if self.verbose:
         #     print('slopes_before:{}'.format(slopes))
         # slopes_sec = [slo + slopes[i + 1] for i, slo in enumerate(slopes) if i + 1 < len(slopes)]
+        slope_sec = 0
         for i in range(len(slopes)):
             if not i + sec_size - 1 < len(slopes):
                 break
-            slope_sec = 0
-            for j in range(sec_size):
-                slope_sec += slopes[i + j]
+            # slope_sec = 0
+            if i == 0:
+                for j in range(sec_size):
+                    slope_sec += slopes[j]
+            else:
+                slope_sec -= slopes[i - 1]
+                slope_sec += slopes[i - 1 + sec_size]
             slopes_sec.append(slope_sec)
 
         # print('varys:{}'.format(varys))
@@ -300,10 +307,16 @@ class LineDetector:
             print("var:{}".format(var))
         return var, mean
 
+    def __get_brightness(self, gray_img):
+        """将灰度图的亮度在竖直方向上做合"""
+        brightness = np.max(gray_img, axis=0)
+        return brightness
+
     def detect_error_line(self, origin_img, img_name, var_limit=2.0, width_limit_max=11.5, width_limit_min=6,
                           slope_limit=5, variation_limit=3):
+        """origin_img为RGB图"""
         print('--------------------{}--------------------'.format(img_name))
-        pre_img = self.__pre_process(origin_img, self.threshold)
+        gray_img, pre_img = self.__pre_process(origin_img, self.threshold)
         del_img, offset = self.__del_white_margin(pre_img, self.margin)
 
         if self.show:
@@ -312,7 +325,7 @@ class LineDetector:
 
         sample_count = round(del_img.shape[1] / 100 * self.sample_count_per_hundred)
         step = del_img.shape[1] // sample_count
-        info = self.__get_info(del_img, step)
+        info = self.__get_info(del_img, self.__get_brightness(gray_img), step)
         detect_img, err_flag = self.__draw_error_circle(origin_img, offset, info, step, var_limit, width_limit_max,
                                                         width_limit_min, slope_limit, variation_limit)
         if self.verbose:
