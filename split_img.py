@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 
 def get_digit_position(img):
@@ -53,6 +54,8 @@ def find_line_pos(image, char_location):
 def get_line_position(image):
     """输入一张已经按数字标号分割出来的灰度化图片，获取该图片中三条线的位置
         返回True代表该图中找到的线的位置具有普适性，可以用于分割其他图片中的线"""
+    # cv2.imshow('image', image)
+    # cv2.waitKey()
     left_ver_line = image[:, 0]
     left_line_pos = []
     pre_v = 0
@@ -75,7 +78,7 @@ def get_line_position(image):
     line_pos = []
     if len(left_line_pos) == 3 and len(right_line_pos) == 3:
         for i in range(len(left_line_pos)):
-            if abs(left_line_pos[i] - right_line_pos[i]) >= 5:
+            if abs(left_line_pos[i] - right_line_pos[i]) > 20:
                 return False, line_pos
         margin = (left_line_pos[2] - left_line_pos[0]) // 2
         for pos in left_line_pos:

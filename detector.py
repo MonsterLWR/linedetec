@@ -2,19 +2,25 @@ from utils import *
 from split_img import *
 from ocr import get_digit
 from lineDetector import LineDetector
+import tkinter as tk
 
 
 class Detector:
-    def __init__(self):
+    def __init__(self, text_widget=None):
         self.lineDetector = LineDetector(verbose=False)
+        self.text_widget = text_widget
+        if text_widget is not None:
+            self.text_widget['state'] = 'normal'
+            self.text_widget.delete('1.0', tk.END)
+            self.text_widget['state'] = 'disabled'
 
     def __del_white(self, img):
         """清除灰度化后图片的白边，以及大图片中间的白块"""
         width = img.shape[1]
         pos = width // 2
-        while img[0][pos] >= 245:
+        while img[0][pos] >= 240:
             img = img[1:, :]
-        while img[-1][pos] >= 245:
+        while img[-1][pos] >= 240:
             img = img[:-1, :]
 
         # 删除大图片中间的白块
@@ -35,7 +41,7 @@ class Detector:
             if not os.path.exists(lines_dir):
                 os.mkdir(lines_dir)
 
-        with open(os.path.join(err_dir, 'err.txt'), 'a') as f:
+        with open(os.path.join(dir, 'err.txt'), 'a') as f:
             for i in range(len(char_location)):
                 location = char_location[i]
                 digit = get_digit(image[location - 10:location + 20, -125:])
@@ -57,15 +63,22 @@ class Detector:
             pos = line_pos[i]
             line_img = image[pos:pos + margin]
             line_name = '{}-{}.jpg'.format(img_name, i + 1)
+
             if save:
                 save_img(line_img, lines_dir, line_name)
+            if self.text_widget is not None:
+                self.text_widget['state'] = 'normal'
+                self.text_widget.insert(tk.END, '正在检测{}\n'.format(line_name))
+                self.text_widget['state'] = 'disabled'
+                self.text_widget.see('end')
 
             line_img = cv2.cvtColor(line_img, cv2.COLOR_GRAY2BGR)
             detected_line, err_flag = self.lineDetector.detect_error_line(line_img, line_name)
 
             if err_flag:
                 save_img(detected_line, err_dir, line_name)
-                print(line_name, file=err_txt)
+                base_name, _ = os.path.splitext(line_name)
+                print(base_name, file=err_txt)
                 # cv2.imshow(line_name, detected_line)
 
     def detect(self, image_path, target_dir):

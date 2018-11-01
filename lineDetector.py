@@ -204,18 +204,27 @@ class LineDetector:
             return origin_img, True
 
         # 是否出现多个线的边界点
-        flag = False
-        for i, count in enumerate(info['edge_counts']):
-            if count > 2:
-                # 画深蓝圈
-                flag = True
-                cv2.circle(origin_img,
-                           (offset['x'] + i * step, offset['y'] + info['first_edge_dis'][i] + info['widths'][i] // 2),
-                           30,
-                           (255, 0, 0),
-                           1)
-        if flag:
+        if max(info['edge_counts']) > 2:
+            # 画深蓝方框
+            cv2.rectangle(origin_img,
+                          (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
+                          (offset['x'] + info['img_width'],
+                           offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
+                          (255, 0, 0),
+                          1)
             return origin_img, True
+        # flag = False
+        # for i, count in enumerate(info['edge_counts']):
+        #     if count > 2:
+        #         # 画深蓝圈
+        #         flag = True
+        #         cv2.circle(origin_img,
+        #                    (offset['x'] + i * step, offset['y'] + info['first_edge_dis'][i] + info['widths'][i] // 2),
+        #                    30,
+        #                    (255, 0, 0),
+        #                    1)
+        # if flag:
+        #     return origin_img, True
 
         # 是否亮度异常
         if max(info['brightness_max']) >= brightness_limit:
