@@ -82,7 +82,7 @@ def get_line_position(image):
                 return False, line_pos
         margin = (left_line_pos[2] - left_line_pos[0]) // 2
         for pos in left_line_pos:
-            line_pos.append(pos - margin // 2)
+            line_pos.append(pos - round(margin * 0.5))
         return True, line_pos
     else:
         return False, line_pos

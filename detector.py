@@ -6,16 +6,28 @@ import tkinter as tk
 
 
 class Detector:
-    def __init__(self, text_widget=None):
-        self.lineDetector = LineDetector(verbose=False)
+    def __init__(self, text_widget=None, err_choice=None):
+        self.lineDetector = LineDetector(verbose=False, err_choice=err_choice)
         self.text_widget = text_widget
-        if text_widget is not None:
+        self.__clear_text_widget()
+        self.__add_text_widget('开始检测，请耐心等待...\n')
+
+    def __clear_text_widget(self):
+        if self.text_widget is not None:
             self.text_widget['state'] = 'normal'
             self.text_widget.delete('1.0', tk.END)
             self.text_widget['state'] = 'disabled'
 
+    def __add_text_widget(self, str):
+        if self.text_widget is not None:
+            self.text_widget['state'] = 'normal'
+            self.text_widget.insert(tk.END, str)
+            self.text_widget['state'] = 'disabled'
+            self.text_widget.see('end')
+
     def __del_white(self, img):
         """清除灰度化后图片的白边，以及大图片中间的白块"""
+        print(img.shape)
         width = img.shape[1]
         pos = width // 2
         while img[0][pos] >= 240:
@@ -57,27 +69,36 @@ class Detector:
 
                 self.__detect_lines(detected_img, line_pos, digit, lines_dir, err_dir, f, save)
 
+            self.__add_text_widget('检测完成\n')
+            # if self.text_widget is not None:
+            #     self.text_widget['state'] = 'normal'
+            #     self.text_widget.insert(tk.END, )
+            #     self.text_widget['state'] = 'disabled'
+            #     self.text_widget.see('end')
+
     def __detect_lines(self, image, line_pos, img_name, lines_dir=None, err_dir=None, err_txt=None, save=False):
         margin = (line_pos[2] - line_pos[0]) // 2
         for i in range(3):
             pos = line_pos[i]
             line_img = image[pos:pos + margin]
             line_name = '{}-{}.jpg'.format(img_name, i + 1)
+            base_name, _ = os.path.splitext(line_name)
 
             if save:
                 save_img(line_img, lines_dir, line_name)
-            if self.text_widget is not None:
-                self.text_widget['state'] = 'normal'
-                self.text_widget.insert(tk.END, '正在检测{}\n'.format(line_name))
-                self.text_widget['state'] = 'disabled'
-                self.text_widget.see('end')
+
+            self.__add_text_widget('正在检测{}\n'.format(base_name))
+            # if self.text_widget is not None:
+            #     self.text_widget['state'] = 'normal'
+            #     self.text_widget.insert(tk.END, )
+            #     self.text_widget['state'] = 'disabled'
+            #     self.text_widget.see('end')
 
             line_img = cv2.cvtColor(line_img, cv2.COLOR_GRAY2BGR)
             detected_line, err_flag = self.lineDetector.detect_error_line(line_img, line_name)
 
             if err_flag:
                 save_img(detected_line, err_dir, line_name)
-                base_name, _ = os.path.splitext(line_name)
                 print(base_name, file=err_txt)
                 # cv2.imshow(line_name, detected_line)
 

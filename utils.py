@@ -10,8 +10,5 @@ def read_gray_img(img_file):
     return img
 
 
-
-
-
 def save_img(saved_img, dir, img_name):
     cv2.imwrite(os.path.join(dir, img_name), saved_img)

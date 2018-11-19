@@ -1,11 +1,12 @@
 # coding=utf-8
 import numpy as np
 import cv2
-import os
 
 
 class LineDetector:
-    def __init__(self, margin=5, threshold=40, sample_count_per_hundred=10, verbose=True, show=False):
+    def __init__(self, margin=5, threshold=40, sample_count_per_hundred=10, verbose=True, show=False,
+                 err_choice=None):
+        self.err_choice = err_choice
         self.margin = margin
         self.threshold = threshold
         self.verbose = verbose
@@ -163,6 +164,7 @@ class LineDetector:
     def __find_error(self, origin_img, offset, info, step, var_limit, width_limit_max,
                      width_limit_min, slope_limit, variation_limit, big_vary_count, brightness_limit):
         """在原图标识出出错的线，返回标识后的图片和是否进行过标识"""
+
         # 检测是否存在断线
         pre_width = 0
         flag = False
@@ -173,7 +175,8 @@ class LineDetector:
                 flag = True
                 # 画红圈
                 cv2.circle(origin_img,
-                           (offset['x'] + i * step, offset['y'] + info['first_edge_dis'][i] + info['widths'][i] // 2),
+                           (offset['x'] + i * step,
+                            offset['y'] + info['first_edge_dis'][i] + info['widths'][i] // 2),
                            30,
                            (0, 0, 255),
                            1)
@@ -188,7 +191,10 @@ class LineDetector:
                            1)
             pre_width = width
         if flag:
-            return origin_img, True
+            if self.err_choice['断线异常'] == 1:
+                return origin_img, True
+            else:
+                return origin_img, False
 
         if min(info['brightness_max']) <= self.threshold and max(info['widths']) > 0:
             # 只断掉了一小截
@@ -201,110 +207,106 @@ class LineDetector:
                        30,
                        (0, 0, 255),
                        1)
-            return origin_img, True
+            if self.err_choice['断线异常'] == 1:
+                return origin_img, True
+            else:
+                return origin_img, False
 
-        # 是否出现多个线的边界点
-        if max(info['edge_counts']) > 2:
-            # 画深蓝方框
-            cv2.rectangle(origin_img,
-                          (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
-                          (offset['x'] + info['img_width'],
-                           offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
-                          (255, 0, 0),
-                          1)
-            return origin_img, True
-        # flag = False
-        # for i, count in enumerate(info['edge_counts']):
-        #     if count > 2:
-        #         # 画深蓝圈
-        #         flag = True
-        #         cv2.circle(origin_img,
-        #                    (offset['x'] + i * step, offset['y'] + info['first_edge_dis'][i] + info['widths'][i] // 2),
-        #                    30,
-        #                    (255, 0, 0),
-        #                    1)
-        # if flag:
-        #     return origin_img, True
+        if self.err_choice['边界分岔'] == 1:
+            # 是否出现多个线的边界点
+            if max(info['edge_counts']) > 2:
+                # 画深蓝方框
+                cv2.rectangle(origin_img,
+                              (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
+                              (offset['x'] + info['img_width'],
+                               offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
+                              (255, 0, 0),
+                              1)
+                return origin_img, True
 
-        # 是否亮度异常
-        if max(info['brightness_max']) >= brightness_limit:
-            indices = np.argmax(info['brightness_max'])
-            sample_index = indices // step
-            # 画黄圈
-            cv2.circle(origin_img, (
-                offset['x'] + indices,
-                offset['y'] + info['first_edge_dis'][sample_index] + info['widths'][sample_index] // 2),
-                       30,
-                       (0, 255, 255),
-                       1)
-            return origin_img, True
+        if self.err_choice['亮度异常'] == 1:
+            # 是否亮度异常
+            if max(info['brightness_max']) >= brightness_limit:
+                indices = np.argmax(info['brightness_max'])
+                sample_index = indices // step
+                # 画黄圈
+                cv2.circle(origin_img, (
+                    offset['x'] + indices,
+                    offset['y'] + info['first_edge_dis'][sample_index] + info['widths'][sample_index] // 2),
+                           30,
+                           (0, 255, 255),
+                           1)
+                return origin_img, True
 
-        # 是否粗细不合适
         var, mean = self.__compute_var_mean(info['widths'])
-        # mean_div_img_width = mean / info['img_width']
-        # if self.verbose:
-        #     print('mean_div_img_width:{}'.format(mean_div_img_width))
-        if mean > width_limit_max or (width_limit_min > mean > 0.0):
-            # 画浅蓝方框
-            cv2.rectangle(origin_img,
-                          (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
-                          (offset['x'] + info['img_width'],
-                           offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
-                          (255, 255, 0),
-                          1)
-            return origin_img, True
 
-        # 是否弯曲太厉害
-        max_slope = max(info['slopes'])
-        min_slope = min(info['slopes'])
-        if max_slope >= slope_limit or abs(min_slope) >= slope_limit:
-            # 画紫色方框
-            cv2.rectangle(origin_img,
-                          (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
-                          (offset['x'] + info['img_width'],
-                           offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
-                          (255, 0, 255),
-                          1)
-            return origin_img, True
+        if self.err_choice['过粗过细'] == 1:
+            # 是否粗细不合适
+            # mean_div_img_width = mean / info['img_width']
+            # if self.verbose:
+            #     print('mean_div_img_width:{}'.format(mean_div_img_width))
+            if mean > width_limit_max or (width_limit_min > mean > 0.0):
+                # 画浅蓝方框
+                cv2.rectangle(origin_img,
+                              (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
+                              (offset['x'] + info['img_width'],
+                               offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
+                              (255, 255, 0),
+                              1)
+                return origin_img, True
 
-        # 整体粗细变化是否太大,包括方差过大和过多的局部粗细变化
-        varys = info['varys']
-        if var > var_limit or np.where(np.abs(np.array(varys)) >= 2)[0].shape[0] >= big_vary_count:
-            # 画绿框
-            cv2.rectangle(origin_img,
-                          (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
-                          (offset['x'] + info['img_width'],
-                           offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
-                          (0, 255, 0),
-                          1)
-            return origin_img, True
+        if self.err_choice['弯曲异常'] == 1:
+            # 是否弯曲太厉害
+            max_slope = max(info['slopes'])
+            min_slope = min(info['slopes'])
+            if max_slope >= slope_limit or abs(min_slope) >= slope_limit:
+                # 画紫色方框
+                cv2.rectangle(origin_img,
+                              (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
+                              (offset['x'] + info['img_width'],
+                               offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
+                              (255, 0, 255),
+                              1)
+                return origin_img, True
 
-        # 局部粗细变化
+        if self.err_choice['粗细变化过快'] == 1:
+            # 整体粗细变化是否太大,包括方差过大和过多的局部粗细变化
+            varys = info['varys']
+            if var > var_limit or np.where(np.abs(np.array(varys)) >= 2)[0].shape[0] >= big_vary_count:
+                # 画绿框
+                cv2.rectangle(origin_img,
+                              (offset['x'], offset['y'] + min(info['first_edge_dis']) - 5),
+                              (offset['x'] + info['img_width'],
+                               offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
+                              (0, 255, 0),
+                              1)
+                return origin_img, True
 
-        if max(varys) >= variation_limit:
-            indexes = [i for i, vary in enumerate(varys) if vary == max(varys)]
-            for index in indexes:
-                # 画绿圈
-                index = index + self.sec_size // 2
-                cv2.circle(origin_img,
-                           (offset['x'] + index * step,
-                            offset['y'] + info['first_edge_dis'][index] + info['widths'][index] // 2),
-                           30,
-                           (0, 255, 0),
-                           1)
-            return origin_img, True
-        if abs(min(varys)) >= variation_limit:
-            indexes = [i for i, vary in enumerate(varys) if vary == min(varys)]
-            for index in indexes:
-                # 画绿圈
-                index = index + self.sec_size // 2
-                cv2.circle(origin_img,
-                           (offset['x'] + index * step,
-                            offset['y'] + info['first_edge_dis'][index] + info['widths'][index] // 2),
-                           30,
-                           (0, 255, 0),
-                           1)
-            return origin_img, True
+            # 局部粗细变化
+            if max(varys) >= variation_limit:
+                indexes = [i for i, vary in enumerate(varys) if vary == max(varys)]
+                for index in indexes:
+                    # 画绿圈
+                    index = index + self.sec_size // 2
+                    cv2.circle(origin_img,
+                               (offset['x'] + index * step,
+                                offset['y'] + info['first_edge_dis'][index] + info['widths'][index] // 2),
+                               30,
+                               (0, 255, 0),
+                               1)
+                return origin_img, True
+            if abs(min(varys)) >= variation_limit:
+                indexes = [i for i, vary in enumerate(varys) if vary == min(varys)]
+                for index in indexes:
+                    # 画绿圈
+                    index = index + self.sec_size // 2
+                    cv2.circle(origin_img,
+                               (offset['x'] + index * step,
+                                offset['y'] + info['first_edge_dis'][index] + info['widths'][index] // 2),
+                               30,
+                               (0, 255, 0),
+                               1)
+                return origin_img, True
 
         # 非异常的线
         return origin_img, False
@@ -334,7 +336,8 @@ class LineDetector:
     def detect_error_line(self, origin_img, img_name, var_limit=2.0, width_limit_max=11.5, width_limit_min=6.5,
                           slope_limit=5, variation_limit=3, big_vary_count=4, brightness_limit=180):
         """origin_img为RGB图"""
-        print('--------------------{}--------------------'.format(img_name))
+        if self.verbose:
+            print('--------------------{}--------------------'.format(img_name))
         gray_img, pre_img = self.__pre_process(origin_img, self.threshold)
         del_img, offset = self.__del_white_margin(pre_img, self.margin)
         # 为灰度图去掉白边
