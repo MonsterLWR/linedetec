@@ -5,7 +5,9 @@ import cv2
 import numpy as np
 
 # Tesseract-OCR安装目录
-path = r'C:\Program Files (x86)\Tesseract-OCR'
+# path = r'C:\Program Files (x86)\Tesseract-OCR'
+with open('./ocr_path.txt', 'r') as f:
+    path = f.readline().strip()
 
 pytesseract.pytesseract.tesseract_cmd = os.path.join(path, 'tesseract')
 
@@ -23,4 +25,7 @@ def get_digit(digit_img, factor=3):
 
 
 if __name__ == '__main__':
-    print(pytesseract.image_to_string(Image.open('test2.png'), config=tessdata_dir_config))
+    # print(pytesseract.image_to_string(Image.open('test2.png'), config=tessdata_dir_config))
+    with open('./ocr_path.txt', 'r') as f:
+        line = f.readline()
+        print(line)

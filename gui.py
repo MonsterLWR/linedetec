@@ -55,6 +55,9 @@ class Application(Frame):
         else:
             lb.config(text="未选择图片")
 
+    def __always_select(self):
+        self.button.select()
+
     def __init__(self, master=None):
         Frame.__init__(self, master)
         self.detect_thread = None
@@ -89,7 +92,12 @@ class Application(Frame):
         self.err_types = {'断线异常': IntVar(value=1), '边界分岔': IntVar(value=1), '亮度异常': IntVar(value=1),
                           '弯曲异常': IntVar(value=1), '过粗过细': IntVar(value=1), '粗细变化过快': IntVar(value=1)}
         for i, type in enumerate(sorted(self.err_types.keys())):
-            checkbutton = Checkbutton(master=self.checkFrame, text=type, variable=self.err_types[type])
+            if type == '断线异常':
+                checkbutton = Checkbutton(master=self.checkFrame, text=type, variable=self.err_types[type],
+                                          command=self.__always_select)
+                self.button = checkbutton
+            else:
+                checkbutton = Checkbutton(master=self.checkFrame, text=type, variable=self.err_types[type])
             checkbutton.grid(row=check_row, column=i % 2)
             # print(type, self.err_types[type])
             if i % 2 == 1:

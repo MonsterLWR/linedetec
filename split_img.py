@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+#import matplotlib.pyplot as plt
 
 
 def get_digit_position(img):
@@ -8,8 +9,12 @@ def get_digit_position(img):
     pos = width // 2
 
     # 根据像素在垂直方向上的投影判断数字标识的出现
-    pix_sum = np.sum(img[:, pos:], axis=1)
-    pix_sum_bool = np.logical_and(15000 > pix_sum, pix_sum > 2000)
+    zero_one_img = (img[:, pos:])
+    zero_one_img = zero_one_img >= 200
+    pix_sum = np.sum(zero_one_img, axis=1)
+    # plt.plot(pix_sum)
+    # plt.show()
+    pix_sum_bool = np.logical_and(50 > pix_sum, pix_sum > 10)
     char_location = []
     pre_bool = False
     bool_count = 0
@@ -42,16 +47,40 @@ def get_digit_position(img):
 def find_line_pos(image, char_location):
     """根据image和对应的char_location，找到用于分割线的line_pos"""
     line_pos = []
-    pos_flag = False
-    i = 0
-    while not pos_flag:
-        img = image[char_location[i]:char_location[i + 1], :]
-        pos_flag, line_pos = get_line_position(img)
-        i += 1
+    # pos_flag = False
+    # i = 0
+    # while not pos_flag:
+    #     img = image[char_location[i]:char_location[i + 1], :]
+    #     pos_flag, line_pos = get_line_position(img)
+    #     i += 1
+    pos_num = 3
+    while pos_num != 0:
+        for i in range(len(char_location) - 1):
+            img = image[char_location[i]:char_location[i + 1], :]
+            pos_flag, line_pos = get_line_position(img, pos_num)
+            if pos_flag:
+                break
+
+        if len(line_pos) > 0:
+            break
+        pos_num -= 1
+
+    if len(line_pos) == 0:
+        raise ValueError("can't calculate line_pos!")
+
     return line_pos
 
 
-def get_line_position(image):
+def cal_margin(line_pos):
+    if len(line_pos) > 1:
+        return (line_pos[-1] - line_pos[0]) // (len(line_pos) - 1)
+    elif len(line_pos) == 1:
+        return line_pos[0]
+    else:
+        raise ValueError("wrong line_pos!")
+
+
+def get_line_position(image, pos_num=3):
     """输入一张已经按数字标号分割出来的灰度化图片，获取该图片中三条线的位置
         返回True代表该图中找到的线的位置具有普适性，可以用于分割其他图片中的线"""
     # cv2.imshow('image', image)
@@ -74,15 +103,19 @@ def get_line_position(image):
             right_line_pos.append(i)
         pre_v = v
 
-    # 判断该图中线的位置是否普适，即线的左右位置是否对其，是否一共有三根线
+    # 判断该图中线的位置是否普适，即线的左右位置是否对其，是否一共有pos_num根线
     line_pos = []
-    if len(left_line_pos) == 3 and len(right_line_pos) == 3:
+    if len(left_line_pos) == pos_num and len(right_line_pos) == pos_num:
         for i in range(len(left_line_pos)):
             if abs(left_line_pos[i] - right_line_pos[i]) > 20:
                 return False, line_pos
-        margin = (left_line_pos[2] - left_line_pos[0]) // 2
+        # margin = cal_margin(left_line_pos)
         for pos in left_line_pos:
-            line_pos.append(pos - round(margin * 0.5))
+            # temp_pos = pos - round(margin * 0.5)
+            # if temp_pos < 0:
+            #     # skip掉包含数字的区域
+            #     temp_pos = 30
+            line_pos.append(pos)
         return True, line_pos
     else:
         return False, line_pos

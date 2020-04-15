@@ -55,8 +55,10 @@ class Detector:
 
         with open(os.path.join(dir, 'err.txt'), 'a') as f:
             for i in range(len(char_location)):
-                location = char_location[i]
-                digit = get_digit(image[location - 10:location + 20, -125:])
+                location = char_location[i] if char_location[i] > 10 else 10
+                digit_img = image[location - 10:location + 20, -125:] if location > 10 \
+                    else image[0:30, -125:]
+                digit = get_digit(digit_img)
                 print(digit)
 
                 if i == len(char_location) - 1:
@@ -76,11 +78,18 @@ class Detector:
             #     self.text_widget['state'] = 'disabled'
             #     self.text_widget.see('end')
 
+    def __gen_line_img_index(self, pos, margin):
+        start, end = pos - margin // 2, pos + margin // 2
+        # skip掉数字
+        start = 30 if start < 30 else start
+        return start, end
+
     def __detect_lines(self, image, line_pos, img_name, lines_dir=None, err_dir=None, err_txt=None, save=False):
-        margin = (line_pos[2] - line_pos[0]) // 2
-        for i in range(3):
+        margin = cal_margin(line_pos)
+        for i in range(len(line_pos)):
             pos = line_pos[i]
-            line_img = image[pos:pos + margin]
+            start, end = self.__gen_line_img_index(pos, margin)
+            line_img = image[start:end]
             line_name = '{}-{}.jpg'.format(img_name, i + 1)
             base_name, _ = os.path.splitext(line_name)
 

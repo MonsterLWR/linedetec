@@ -4,7 +4,7 @@ import cv2
 
 
 class LineDetector:
-    def __init__(self, margin=5, threshold=40, sample_count_per_hundred=10, verbose=True, show=False,
+    def __init__(self, margin=5, threshold=100, sample_count_per_hundred=50, verbose=True, show=False,
                  err_choice=None):
         self.err_choice = err_choice
         self.margin = margin
@@ -165,6 +165,7 @@ class LineDetector:
                      width_limit_min, slope_limit, variation_limit, big_vary_count, brightness_limit):
         """在原图标识出出错的线，返回标识后的图片和是否进行过标识"""
 
+        # 断线异常影响后续异常的检测，若检测到断线异常则直接返回。
         # 检测是否存在断线
         pre_width = 0
         flag = False
@@ -191,10 +192,7 @@ class LineDetector:
                            1)
             pre_width = width
         if flag:
-            if self.err_choice['断线异常'] == 1:
-                return origin_img, True
-            else:
-                return origin_img, False
+            return origin_img, True
 
         if min(info['brightness_max']) <= self.threshold and max(info['widths']) > 0:
             # 只断掉了一小截
@@ -207,10 +205,11 @@ class LineDetector:
                        30,
                        (0, 0, 255),
                        1)
-            if self.err_choice['断线异常'] == 1:
-                return origin_img, True
-            else:
-                return origin_img, False
+            flag = True
+            # if self.err_choice['断线异常'] == 1:
+            return origin_img, True
+            # else:
+            #     return origin_img, False
 
         if self.err_choice['边界分岔'] == 1:
             # 是否出现多个线的边界点
@@ -222,7 +221,8 @@ class LineDetector:
                                offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
                               (255, 0, 0),
                               1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
 
         if self.err_choice['亮度异常'] == 1:
             # 是否亮度异常
@@ -236,7 +236,8 @@ class LineDetector:
                            30,
                            (0, 255, 255),
                            1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
 
         var, mean = self.__compute_var_mean(info['widths'])
 
@@ -253,7 +254,8 @@ class LineDetector:
                                offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
                               (255, 255, 0),
                               1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
 
         if self.err_choice['弯曲异常'] == 1:
             # 是否弯曲太厉害
@@ -267,7 +269,8 @@ class LineDetector:
                                offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
                               (255, 0, 255),
                               1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
 
         if self.err_choice['粗细变化过快'] == 1:
             # 整体粗细变化是否太大,包括方差过大和过多的局部粗细变化
@@ -280,7 +283,8 @@ class LineDetector:
                                offset['y'] + max(info['first_edge_dis']) + max(info['widths']) + 5),
                               (0, 255, 0),
                               1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
 
             # 局部粗细变化
             if max(varys) >= variation_limit:
@@ -294,7 +298,8 @@ class LineDetector:
                                30,
                                (0, 255, 0),
                                1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
             if abs(min(varys)) >= variation_limit:
                 indexes = [i for i, vary in enumerate(varys) if vary == min(varys)]
                 for index in indexes:
@@ -306,10 +311,11 @@ class LineDetector:
                                30,
                                (0, 255, 0),
                                1)
-                return origin_img, True
+                flag = True
+                # return origin_img, True
 
         # 非异常的线
-        return origin_img, False
+        return origin_img, flag
 
     def __compute_var_mean(self, widths):
         widths = np.array(widths)
@@ -362,8 +368,9 @@ class LineDetector:
 
 
 if __name__ == '__main__':
-    detector = LineDetector(verbose=True, show=True)
-    dir = '20180530-002'
+    detector = LineDetector(verbose=True, show=True, err_choice={'断线异常': 1, '边界分岔': 1, '亮度异常': 1,
+                                                                 '弯曲异常': 1, '过粗过细': 1, '粗细变化过快': 1})
+    # dir = '20180530-002'
     # names = [
     #     # '153-3.png',
     #     # '154-3.png',
@@ -385,7 +392,7 @@ if __name__ == '__main__':
     #             target_file = os.path.join(detected_dir, file_name)
     #             cv2.imwrite(target_file, detected_img)
 
-    file_name = '2.png'
+    file_name = '9.jpg'
     image = cv2.imread(file_name)
     detected_img, err = detector.detect_error_line(image, file_name)
     cv2.waitKey()
